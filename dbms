@@ -1,0 +1,185 @@
+
+select distinct maker from product where type = 'pc'
+                                     and maker not in
+                                         (select distinct maker from product where type= 'laptop');
+-----------------------------------------------------------------------------------------------------------
+select distinct maker from product join pc on product.model = pc.model where pc.speed>=450
+------------------------------------------------------------------------------------------------------------
+SELECT DISTINCT Product.maker, Laptop.speed
+FROM Product
+JOIN Laptop ON Product.model = Laptop.model
+WHERE Laptop.hd >= 10;
+--------------------------------------------------------------------------------------------------------------
+select distinct maker from product where type = 'pc' and maker not in (select distinct maker from product where type = 'laptop')
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+select model,price from printer where price=(select max(price) from printer);
+----------------------------------------------------------------------------------------
+select hd from PC group by hd having count(hd) >=2;
+----------------------------------------------------
+with color_printers as (select * from printer where color = 'y')
+ select distinct maker from color_printers as c join product p on c.model = p.model where price = (select min(price) from color_printers);
+-------------------------------------------------------------------------------------------------------------------------------------------
+select maker, avg(screen) from product, laptop where product.model = laptop.model group by maker 
+-------------------------------------------------------------------------------------------------------------------------------------------------
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+drop table if exists bank_balance;
+
+create table if not exists bank_balance(
+    name    varchar(255) primary key,
+    balance int
+);
+
+insert into bank_balance values('Tom',200), ('Jerry', 500);
+
+drop procedure if exists money_transfer;
+
+delimiter $%
+create procedure money_transfer(
+    amount int,
+    debitor varchar(255),
+    creditor varchar(255)
+)
+begin
+    start transaction ;
+    create table if not exists logs(message varchar(1000));
+    truncate table logs;
+
+    select balance into @debitor_balance
+    from bank_balance where name = debitor;
+
+    insert into logs select
+                         concat('bank balance for debitor is',@debitor_balance,'. ');
+
+    if @debitor_balance<amount
+        then
+          insert into logs select
+             concat('transaction not possible as',@debitor_balance,' < ',amount);
+          rollback ;
+    else
+        insert into logs select
+            concat('starting transaction as',@debitor_balance,'>=',amount);
+        update bank_balance
+        set balance = balance - amount
+        where name = debitor;
+
+        insert into logs select
+                 concat('debitor amount from ',debitor);
+
+        update bank_balance
+            set balance = balance + amount
+            where name = creditor;
+
+        insert into logs select
+                 concat('credited amount to ', creditor);
+        commit;
+    end if;
+
+    insert into logs
+        select concat('bank balance of ', name, 'is', balance)
+        from bank_balance
+        where name in (debitor, creditor);
+
+        select * from logs;
+end $%
+
+call money_transfer(
+     50,'Tom','Jerry'
+     );
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+create database if not exists book;
+
+    DROP TABLE IF EXISTS Reviews;
+DROP TABLE IF EXISTS OrderItems;
+DROP TABLE IF EXISTS Orders;
+DROP TABLE IF EXISTS Customers;
+DROP TABLE IF EXISTS Books;
+
+CREATE TABLE if not exists Books (
+    book_id INT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    publication_date DATE,
+    genre VARCHAR(50)
+    -- Add other relevant columns as needed
+);
+
+INSERT INTO Books (book_id, title, author, price, description, publication_date, genre)
+VALUES
+    (1, 'To Kill a Mockingbird', 'Harper Lee', 12.99, 'A gripping portrayal of justice and racism in the deep South.', '1960-07-11', 'Fiction'),
+    (2, '1984', 'George Orwell', 9.99, 'A dystopian novel about a totalitarian regime and thought control.', '1949-06-08', 'Science Fiction'),
+    (3, 'The Great Gatsby', 'F. Scott Fitzgerald', 10.50, 'A tale of wealth, love, and decadence in the Jazz Age.', '1925-04-10', 'Fiction');
+
+
+CREATE TABLE if not exists Customers (
+    customer_id INT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    -- Add other relevant columns such as address, phone number, etc.
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO Customers  (customer_id, first_name, last_name, email, password)
+VALUES
+    (1, 'John', 'Doe', 'john.doe@example.com', 'Passkey1'),
+    (2, 'Jane', 'Smith', 'jane.smith@example.com', 'Passkey2'),
+    (3, 'shined', 'Rotes', 'jhond.rotes@example.com', 'Passkey2');
+
+
+CREATE TABLE if not exists Orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'Pending', -- Can be 'Pending', 'Completed', 'Cancelled', etc.
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+);
+
+INSERT INTO Orders (order_id, customer_id, order_date, total_amount, status)
+VALUES
+    (1, 1, '2024-12-26 10:30:00', 32.48, 'Completed'),
+    (2, 2, '2024-04-28 10:45:00', 10.50, 'Pending'),
+    (3, 3, '2024-07-21 15:45:00', 45.55, 'Completed');
+
+
+
+CREATE TABLE if not exists OrderItems (
+    order_item_id INT PRIMARY KEY,
+    order_id INT,
+    book_id INT,
+    quantity INT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES Orders(order_id),
+    FOREIGN KEY (book_id) REFERENCES Books(book_id)
+);
+
+INSERT INTO OrderItems (order_item_id, order_id, book_id, quantity, price)
+VALUES
+    (1, 1, 1, 2, 25.98), -- Two copies of "To Kill a Mockingbird"
+    (2, 1, 2, 1, 6.50),  -- One copy of "1984"
+    (3, 2, 3, 1, 10.50); -- One copy of "The Great Gatsby"
+
+
+CREATE TABLE if not exists Reviews (
+    review_id INT PRIMARY KEY,
+    customer_id INT,
+    book_id INT,
+    rating INT CHECK (rating >= 1 AND rating <= 5),
+    review_text TEXT,
+    review_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
+    FOREIGN KEY (book_id) REFERENCES Books(book_id)
+);
+
+INSERT INTO Reviews (review_id, customer_id, book_id, rating, review_text, review_date)
+VALUES
+    (1, 1, 1, 5, 'Absolutely loved this book!', '2024-06-19 12:00:00'),
+    (2, 2, 2, 4, 'Very thought-provoking and relevant even today.', '2024-06-19 13:30:00');
+
